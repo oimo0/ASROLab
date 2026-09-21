@@ -4,9 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0a0b0f" />
-  <meta name="description" content="ASROの小さな実験と便利ツールを置いていく場所。思いついたら、つくってみる。" />
-  <title>ASRO Lab — 思いついたら、つくってみる。</title>
+  <meta name="description" content="ASROで作ったWebツールや小さな実験をまとめるASRO Lab。" />
+  <title>ASRO Lab</title>
   <link rel="stylesheet" href="assets/css/lab.css" />
+  <link rel="stylesheet" href="assets/css/refine.css" />
   <script>
     (() => {
       const saved = localStorage.getItem('asro-lab-theme') || 'auto';
@@ -30,7 +31,7 @@
         <span class="brand-text"><b>ASRO</b><span>Lab</span></span>
       </a>
       <nav class="nav-links" aria-label="ページ内ナビゲーション">
-        <a href="#experiments">Experiments</a>
+        <a href="#experiments">Tools</a>
         <a href="#about">About</a>
       </nav>
       <button class="theme-button" type="button" data-theme-toggle aria-label="テーマを切り替える">
@@ -43,12 +44,12 @@
   <main id="main">
     <section class="hero shell">
       <div class="hero-copy" data-reveal>
-        <div class="hero-kicker"><span></span>ASRO / LAB</div>
+        <div class="hero-kicker"><span></span>ASRO LAB</div>
         <h1>思いついたら、<br><em>つくってみる。</em></h1>
-        <p>ASROで生まれた、小さなアイデアの置き場所。<br>便利なものも、実験中のものも、ちょっと変なものも。</p>
+        <p>ASROで作ったWebツールや小さな実験をまとめています。</p>
         <div class="hero-actions">
-          <a class="cta" href="#experiments">見てみる <span>↓</span></a>
-          <div class="hero-meta"><strong data-tool-count>00</strong><span>published tools</span></div>
+          <a class="cta" href="#experiments">ツールを見る <span>↓</span></a>
+          <div class="hero-meta"><strong data-tool-count>00</strong><span>公開中</span></div>
         </div>
       </div>
 
@@ -61,20 +62,22 @@
             <span class="orbit orbit-c"></span>
             <b></b>
           </div>
-          <div class="orb-label"><span>ASRO Lab</span><small>Ideas, in motion.</small></div>
+          <div class="orb-label"><span>ASRO Lab</span><small>Tools & experiments</small></div>
         </div>
       </div>
     </section>
 
-    <section class="intro shell" id="about" data-reveal>
-      <div class="intro-line"></div>
-      <p>完成してから出す場所じゃなくて、<br><strong>まず作って、触って、そこから考える場所。</strong></p>
-      <span class="intro-index">01 / IDEA → BUILD → TRY</span>
+    <section class="about-card shell" id="about" data-reveal>
+      <div>
+        <span class="section-label">About</span>
+        <h2>ASRO Labについて</h2>
+      </div>
+      <p>ASROで作った小さなWebツールや試作を公開する場所です。完成したものだけでなく、実験中のものもここに追加していきます。</p>
     </section>
 
     <section class="experiments shell" id="experiments">
       <div class="section-head" data-reveal>
-        <div><span class="section-label">Experiments</span><h2>つくったもの。</h2></div>
+        <div><span class="section-label">Tools</span><h2>ツール一覧</h2></div>
         <p class="result-summary" data-result-summary aria-live="polite">読み込み中…</p>
       </div>
 
@@ -100,31 +103,19 @@
             <span class="empty-dot dot-1"></span><span class="empty-dot dot-2"></span><span class="empty-dot dot-3"></span>
           </div>
           <div class="empty-copy">
-            <span class="empty-small">Nothing here yet.</span>
-            <h3>まだ、何もない。</h3>
-            <p>でも、それでいい。<br>最初のひとつができたら、ここから始まる。</p>
+            <span class="empty-small">No tools yet</span>
+            <h3>まだツールはありません。</h3>
+            <p>公開したツールはここに追加されます。</p>
           </div>
         </section>
 
-        <section class="message-state" data-no-results hidden><h3>見つからなかった。</h3><p>検索条件を変えてみて。</p><button type="button" data-reset-filters>リセット</button></section>
-        <section class="message-state" data-error hidden><h3>読み込めなかった。</h3><p>ツール一覧の取得に失敗しました。</p><button type="button" data-retry>もう一度</button></section>
+        <section class="message-state" data-no-results hidden><h3>見つかりませんでした。</h3><p>検索条件を変えてみてください。</p><button type="button" data-reset-filters>リセット</button></section>
+        <section class="message-state" data-error hidden><h3>読み込めませんでした。</h3><p>ツール一覧の取得に失敗しました。</p><button type="button" data-retry>もう一度</button></section>
       </div>
-    </section>
-
-    <section class="principles shell" data-reveal>
-      <article><span>01</span><h3>Small</h3><p>大きく始めない。必要なところだけ、まず作る。</p></article>
-      <article><span>02</span><h3>Useful</h3><p>ちょっと便利、くらいでもいい。使える形にする。</p></article>
-      <article><span>03</span><h3>Curious</h3><p>役に立つか分からなくても、面白ければ試してみる。</p></article>
-    </section>
-
-    <section class="closing shell" data-reveal>
-      <p>ASRO Lab</p>
-      <h2>次に何ができるかは、<br>まだ決めてない。</h2>
-      <span>それが、ちょうどいい。</span>
     </section>
   </main>
 
-  <footer class="site-footer"><div class="shell"><span>© <span data-year></span> ASRO</span><span>lab.asro.jp</span></div></footer>
+  <footer class="site-footer"><div class="shell"><span>© <span data-year></span> ASRO</span><span>ASRO Lab</span></div></footer>
 
   <template id="tool-card-template">
     <article class="tool-card"><a class="tool-card-link"><div class="thumb"><img class="tool-thumbnail" loading="lazy" decoding="async" alt=""><div class="thumb-fallback" aria-hidden="true"><span>ASRO</span><b>LAB</b></div><div class="badges"><span class="badge badge-new">NEW</span><span class="badge badge-sample">SAMPLE</span></div><span class="open-mark">↗</span></div><div class="tool-body"><div class="tool-top"><span class="status-pill"><i></i><span data-status-label></span></span><span class="tool-category"></span></div><h3 class="tool-name"></h3><p class="tool-description"></p><div class="tool-tags"></div></div></a></article>
