@@ -1,0 +1,10 @@
+{
+  "name": "My Tool",
+  "description": "短い説明をここに書きます。",
+  "thumbnail": "thumbnail.webp",
+  "status": "experimental",
+  "category": "Utility",
+  "tags": ["ASRO Lab"],
+  "added": "2026-09-21",
+  "featured": false
+}
