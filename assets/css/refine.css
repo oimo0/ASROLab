@@ -1,0 +1,110 @@
+.hero{
+  min-height:auto;
+  grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);
+  padding-top:clamp(64px,8vw,104px);
+  padding-bottom:clamp(72px,9vw,116px);
+  gap:clamp(36px,6vw,76px);
+}
+.hero h1{
+  max-width:760px;
+  font-size:clamp(3rem,6.4vw,5.6rem);
+  line-height:.96;
+  letter-spacing:-.06em;
+}
+.hero-copy>p{
+  max-width:580px;
+  margin-top:22px;
+  font-size:clamp(.96rem,1.3vw,1.05rem);
+  line-height:1.8;
+}
+.hero-kicker{margin-bottom:22px}
+.hero-actions{margin-top:28px}
+.orb-card{
+  min-height:360px;
+  border-radius:30px;
+}
+.orb{width:155px}
+.orbit-a{inset:-32px}
+.orbit-b{inset:-58px}
+.orbit-c{inset:-84px}
+.about-card{
+  display:grid;
+  grid-template-columns:minmax(220px,.72fr) minmax(0,1.28fr);
+  gap:clamp(28px,6vw,84px);
+  align-items:start;
+  padding:clamp(28px,4vw,44px);
+  margin-bottom:clamp(70px,8vw,110px);
+  border:1px solid var(--line);
+  border-radius:28px;
+  background:var(--glass);
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(18px);
+}
+.about-card h2{
+  margin:7px 0 0;
+  font-size:clamp(1.55rem,2.8vw,2.25rem);
+  letter-spacing:-.04em;
+}
+.about-card p{
+  margin:0;
+  color:var(--muted);
+  font-size:.96rem;
+  line-height:1.85;
+}
+.experiments{
+  padding-top:0;
+  padding-bottom:clamp(86px,10vw,130px);
+}
+.section-head h2{
+  font-size:clamp(1.9rem,4vw,3.25rem);
+  letter-spacing:-.05em;
+  line-height:1;
+}
+.empty-state{min-height:320px}
+.empty-visual{min-height:320px}
+.empty-orb{width:96px}
+.empty-copy{padding:clamp(28px,4vw,48px)}
+.empty-copy h3{
+  font-size:clamp(1.55rem,2.8vw,2.25rem);
+  line-height:1.15;
+  letter-spacing:-.04em;
+}
+.empty-copy p{font-size:.9rem}
+.tool-name{font-size:1.2rem}
+.site-footer{margin-top:0}
+
+@media(max-width:920px){
+  .hero{grid-template-columns:1fr}
+  .hero-art{max-width:540px}
+  .about-card{grid-template-columns:1fr;gap:18px}
+  .empty-state{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .hero{
+    padding-top:42px;
+    padding-bottom:66px;
+    gap:30px;
+  }
+  .hero h1{
+    font-size:clamp(2.75rem,13vw,4rem);
+    line-height:.98;
+  }
+  .hero-copy>p{font-size:.94rem}
+  .hero-actions{margin-top:24px}
+  .orb-card{min-height:260px}
+  .orb{width:112px}
+  .orbit-a{inset:-24px}
+  .orbit-b{inset:-43px}
+  .orbit-c{inset:-62px}
+  .about-card{
+    padding:22px;
+    border-radius:23px;
+    margin-bottom:66px;
+  }
+  .about-card h2{font-size:1.5rem}
+  .about-card p{font-size:.9rem}
+  .section-head h2{font-size:2rem}
+  .empty-visual{min-height:190px}
+  .empty-copy{padding:24px 20px 28px}
+  .empty-copy h3{font-size:1.65rem}
+}
