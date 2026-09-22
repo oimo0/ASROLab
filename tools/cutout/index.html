@@ -8,7 +8,7 @@
   <title>ASRO Cutout | ASRO Lab</title>
   <link rel="stylesheet" href="./style.css?v=5" />
   <script type="module" src="../../shared/lab-header.js"></script>
-  <script type="module" src="./app.js?v=7"></script>
+  <script type="module" src="./app.js?v=8"></script>
 </head>
 <body>
   <lab-header tool-name="ASRO Cutout"></lab-header>
@@ -99,9 +99,7 @@
               <label class="field">
                 <span>AI品質</span>
                 <select data-quality>
-                  <option value="auto">自動（おすすめ）</option>
-                  <option value="high">最高品質 1024px</option>
-                  <option value="standard">標準 512px</option>
+                  <option value="rmbg">BRIA RMBG-1.4（おすすめ）</option>
                 </select>
                 <small data-quality-note>端末に合わせて自動で選びます。</small>
               </label>
@@ -125,7 +123,7 @@
       <span>端末内AI</span><span>元解像度PNG</span><span>画像アップロードなし</span>
     </section>
 
-    <p class="model-credit">BiRefNet · 初回のみAIモデルの取得が必要です。</p>
+    <p class="model-credit">BRIA RMBG-1.4 · 初回のみAIモデルの取得が必要です。</p>
   </main>
 </body>
 </html>
