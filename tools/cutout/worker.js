@@ -1,7 +1,12 @@
 import { pipeline, RawImage, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
 
-env.allowLocalModels = false;
+env.allowLocalModels = true;
+env.allowRemoteModels = false;
 env.useBrowserCache = true;
+
+// Load model files from this ASRO Lab GitHub Pages deployment.
+// This keeps runtime model downloads off the Hugging Face Hub.
+env.localModelPath = new URL("../../models/", self.location.href).pathname;
 
 const MODEL_ID = "briaai/RMBG-1.4";
 
@@ -42,7 +47,7 @@ async function loadPipeline(requestId, preferredDevice) {
     type: "status",
     phase: "loading",
     title: "RMBG-1.4を準備しています",
-    detail: "初回のみAIモデルを端末へ読み込みます"
+    detail: "ASRO LabからAIモデルを端末へ読み込みます"
   });
 
   const progress_callback = progressReporter(requestId);
@@ -50,7 +55,7 @@ async function loadPipeline(requestId, preferredDevice) {
   try {
     segmenter = await pipeline("image-segmentation", MODEL_ID, {
       device: preferredDevice,
-      dtype: "fp32",
+      dtype: "q8",
       progress_callback
     });
     activeDevice = preferredDevice;
@@ -68,7 +73,7 @@ async function loadPipeline(requestId, preferredDevice) {
     await disposePipeline();
     segmenter = await pipeline("image-segmentation", MODEL_ID, {
       device: "wasm",
-      dtype: "fp32",
+      dtype: "q8",
       progress_callback
     });
     activeDevice = "wasm";
