@@ -121,3 +121,42 @@
 @media(max-width:560px){
   .platform-nav .brand-logo{width:128px}
 }
+
+
+/* Platform v3 — compact brand lockup, no hero logo card */
+.brand-lockup{
+  display:inline-flex;
+  align-items:center;
+  gap:9px;
+}
+.platform-nav .brand-mark-small{
+  display:block;
+  width:30px;
+  height:30px;
+  object-fit:contain;
+  flex:0 0 auto;
+}
+.platform-nav .brand-logo{
+  width:128px;
+  height:auto;
+  max-width:none;
+}
+.platform-hero{
+  grid-template-columns:minmax(0,1fr)!important;
+}
+.platform-hero-brand{
+  display:none!important;
+}
+.platform-hero-copy{
+  width:100%;
+}
+@media(max-width:760px){
+  .platform-nav .brand-mark-small{width:29px;height:29px}
+  .platform-nav .brand-logo{width:126px}
+  .brand-lockup{gap:8px}
+}
+@media(max-width:560px){
+  .platform-nav .brand-mark-small{width:28px;height:28px}
+  .platform-nav .brand-logo{width:122px}
+  .brand-lockup{gap:7px}
+}
