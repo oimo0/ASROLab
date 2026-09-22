@@ -4,9 +4,7 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 const fileInput = $("#file-input");
 const dropZone = $("[data-drop-zone]");
 const workspace = $("[data-workspace]");
-const pickButtons = $$("[data-pick], [data-new-image]");
 const preview = $("[data-preview]");
-const stageEmpty = $("[data-stage-empty]");
 const processing = $("[data-processing]");
 const statusTitle = $("[data-status-title]");
 const statusDetail = $("[data-status-detail]");
@@ -18,11 +16,17 @@ const quality = $("[data-quality]");
 const qualityNote = $("[data-quality-note]");
 const edge = $("[data-edge]");
 const edgeValue = $("[data-edge-value]");
+const edgeField = $("[data-edge-field]");
 const runButton = $("[data-run]");
 const runLabel = $("[data-run-label]");
 const downloadButton = $("[data-download]");
 const deviceTitle = $("[data-device-title]");
 const deviceDetail = $("[data-device-detail]");
+const resultState = $("[data-result-state]");
+const viewSwitch = $("[data-view-switch]");
+const bgSwitch = $("[data-bg-switch]");
+const controlActions = $(".control-actions");
+const pickButtons = $$("[data-pick], [data-change-image]");
 
 const state = {
   file: null,
@@ -38,54 +42,80 @@ const state = {
   highCapable: false,
   mobile: false,
   busy: false,
-  view: "result"
+  view: "original"
 };
 
 let worker = null;
 const pending = new Map();
+let edgeTimer = 0;
+
+function clearTaskTimer(task) {
+  if (task?.timer) clearTimeout(task.timer);
+}
+
+function armTaskTimer(requestId) {
+  const task = pending.get(requestId);
+  if (!task) return;
+  clearTaskTimer(task);
+  task.timer = setTimeout(() => {
+    pending.delete(requestId);
+    try { worker?.terminate(); } catch (_) {}
+    worker = null;
+    task.reject(new Error("AI処理が停止したため中断しました。もう一度試してね。"));
+  }, 180000);
+}
 
 function ensureWorker() {
   if (worker) return worker;
+
   worker = new Worker("./worker.js?v=2", { type: "module" });
 
   worker.addEventListener("message", (event) => {
-  const data = event.data || {};
-  const task = pending.get(data.requestId);
-  if (!task) return;
+    const data = event.data || {};
+    const task = pending.get(data.requestId);
+    if (!task) return;
 
-  if (data.type === "progress") {
-    if (Number.isFinite(data.progress)) {
-      progressBar.style.width = Math.max(3, Math.min(100, data.progress)) + "%";
-      statusDetail.textContent = "AIモデルを読み込み中 " + Math.round(data.progress) + "%";
+    armTaskTimer(data.requestId);
+
+    if (data.type === "progress") {
+      if (Number.isFinite(data.progress)) {
+        const p = Math.max(3, Math.min(100, data.progress));
+        progressBar.style.width = p + "%";
+        statusDetail.textContent = "AIモデルを読み込み中 " + Math.round(data.progress) + "%";
+      }
+      return;
     }
-    return;
-  }
 
-  if (data.type === "status") {
-    statusTitle.textContent = data.title || "処理中";
-    statusDetail.textContent = data.detail || "";
-    if (data.phase === "running") progressBar.style.width = "100%";
-    return;
-  }
+    if (data.type === "status") {
+      statusTitle.textContent = data.title || "処理中";
+      statusDetail.textContent = data.detail || "";
+      if (data.phase === "running") progressBar.style.width = "100%";
+      return;
+    }
 
-  if (data.type === "result") {
-    pending.delete(data.requestId);
-    task.resolve(data);
-    return;
-  }
+    if (data.type === "result") {
+      pending.delete(data.requestId);
+      clearTaskTimer(task);
+      task.resolve(data);
+      return;
+    }
 
-  if (data.type === "error") {
-    pending.delete(data.requestId);
-    const error = new Error(data.message || "AI処理に失敗しました。");
-    error.code = data.code || "";
-    task.reject(error);
-  }
-});
+    if (data.type === "error") {
+      pending.delete(data.requestId);
+      clearTaskTimer(task);
+      const error = new Error(data.message || "AI処理に失敗しました。");
+      error.code = data.code || "";
+      task.reject(error);
+    }
+  });
 
   worker.addEventListener("error", (event) => {
-    for (const [, task] of pending) task.reject(new Error(event.message || "AI worker error"));
+    for (const [, task] of pending) {
+      clearTaskTimer(task);
+      task.reject(new Error(event.message || "AIの起動に失敗しました。"));
+    }
     pending.clear();
-    try { worker.terminate(); } catch (_) {}
+    try { worker?.terminate(); } catch (_) {}
     worker = null;
   });
 
@@ -96,7 +126,8 @@ function workerProcess(payload) {
   return new Promise((resolve, reject) => {
     const activeWorker = ensureWorker();
     const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
-    pending.set(requestId, { resolve, reject });
+    pending.set(requestId, { resolve, reject, timer: 0 });
+    armTaskTimer(requestId);
     activeWorker.postMessage({ type: "process", requestId, ...payload });
   });
 }
@@ -111,7 +142,7 @@ function toast(message) {
   node.textContent = message;
   node.classList.add("show");
   clearTimeout(node._timer);
-  node._timer = setTimeout(() => node.classList.remove("show"), 2400);
+  node._timer = setTimeout(() => node.classList.remove("show"), 2300);
 }
 
 function formatBytes(bytes) {
@@ -124,6 +155,14 @@ function formatBytes(bytes) {
     unit += 1;
   }
   return value.toFixed(value >= 10 || unit === 0 ? 0 : 1) + " " + units[unit];
+}
+
+function shortName(name, max = 28) {
+  if (!name || name.length <= max) return name || "画像";
+  const dot = name.lastIndexOf(".");
+  const ext = dot > 0 ? name.slice(dot) : "";
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  return base.slice(0, Math.max(10, max - ext.length - 1)) + "…" + ext;
 }
 
 async function detectDevice() {
@@ -144,38 +183,34 @@ async function detectDevice() {
     state.highCapable = false;
   }
 
-  if (state.highCapable && !state.mobile) {
-    deviceTitle.textContent = "WebGPU 高品質対応";
-    deviceDetail.textContent = "Autoでは1024px BiRefNetを端末GPUで実行します";
-  } else if (state.webgpu && state.mobile) {
+  if (state.webgpu && state.mobile) {
     deviceTitle.textContent = "WebGPU モバイル";
-    deviceDetail.textContent = "安定性優先でAutoは512px fp16を使います";
+    deviceDetail.textContent = "自動では安定性優先の512px AIを使います";
+  } else if (state.highCapable) {
+    deviceTitle.textContent = "WebGPU 高品質対応";
+    deviceDetail.textContent = "自動では1024px AIを使います";
   } else if (state.webgpu) {
     deviceTitle.textContent = "WebGPU 対応";
-    deviceDetail.textContent = "互換性優先の512px AIを端末GPUで実行します";
+    deviceDetail.textContent = "512px AIをGPUで実行します";
   } else {
-    deviceTitle.textContent = "WASM モード";
-    deviceDetail.textContent = "GPU非対応のためCPUで端末内処理します";
+    deviceTitle.textContent = "CPU モード";
+    deviceDetail.textContent = "512px AIを端末内CPUで実行します";
   }
+
   updateQualityNote();
 }
 
 function updateQualityNote() {
-  const value = quality.value;
-  if (value === "high") {
+  if (quality.value === "high") {
     qualityNote.textContent = state.highCapable
-      ? (state.mobile
-          ? "1024pxモデル。モバイルではメモリ負荷が大きいため、必要なときだけ手動で使ってください。"
-          : "1024pxモデルで細い髪・毛・製品の輪郭を優先します。")
-      : "この端末では最高品質モードを使えないため、実行時に標準へ切り替えます。";
-  } else if (value === "standard") {
-    qualityNote.textContent = "512pxモデル。軽くて幅広い端末で動作します。";
+      ? (state.mobile ? "高品質ですが、スマホでは重くなる場合があります。" : "細かい輪郭を優先する1024px AIです。")
+      : "この端末では使えないため、標準品質へ自動で切り替えます。";
+  } else if (quality.value === "standard") {
+    qualityNote.textContent = "軽くて安定しやすい512px AIです。";
   } else {
-    qualityNote.textContent = state.highCapable && !state.mobile
-      ? "この端末では1024px高品質モデルを自動選択します。"
-      : (state.mobile
-          ? "モバイルでは安定性を優先して512px fp16を自動選択します。"
-          : "この端末では互換性の高い512pxモデルを自動選択します。");
+    qualityNote.textContent = state.mobile
+      ? "スマホでは安定性を優先して512px AIを選びます。"
+      : "端末の対応状況に合わせて自動で選びます。";
   }
 }
 
@@ -186,25 +221,45 @@ function resolveTier() {
   return state.highCapable ? "high" : "standard";
 }
 
+function resetResultUI() {
+  state.mask = null;
+  state.maskWidth = 0;
+  state.maskHeight = 0;
+  state.tier = "";
+
+  if (state.resultUrl) URL.revokeObjectURL(state.resultUrl);
+  state.resultUrl = "";
+
+  viewSwitch.hidden = true;
+  bgSwitch.hidden = true;
+  edgeField.hidden = true;
+  downloadButton.hidden = true;
+  controlActions.classList.remove("has-result");
+  resultState.textContent = "元画像";
+  engine.textContent = "未処理";
+  runLabel.textContent = "背景を透明化";
+  setView("original");
+}
+
 function setBusy(value) {
   state.busy = value;
   runButton.disabled = value || !state.file;
   quality.disabled = value;
   fileInput.disabled = value;
+  pickButtons.forEach((button) => { button.disabled = value; });
   processing.hidden = !value;
+  document.body.classList.toggle("is-busy", value);
+
   if (value) {
+    resultState.textContent = "処理中";
     progressBar.style.width = "4%";
     statusTitle.textContent = "AIを準備しています";
     statusDetail.textContent = "端末内で処理を開始します";
+  } else if (state.resultUrl) {
+    resultState.textContent = "透過済み";
+  } else {
+    resultState.textContent = "元画像";
   }
-}
-
-async function loadImage(url) {
-  const image = new Image();
-  image.decoding = "async";
-  image.src = url;
-  await image.decode();
-  return image;
 }
 
 async function selectFile(file) {
@@ -212,54 +267,45 @@ async function selectFile(file) {
     toast("画像ファイルを選んでね");
     return;
   }
-
   if (file.size > 120 * 1024 * 1024) {
     toast("120MB以下の画像を使ってね");
     return;
   }
 
   if (state.originalUrl) URL.revokeObjectURL(state.originalUrl);
-  if (state.resultUrl) URL.revokeObjectURL(state.resultUrl);
-
   state.file = file;
   state.originalUrl = URL.createObjectURL(file);
-  state.resultUrl = "";
-  state.mask = null;
-  state.maskWidth = 0;
-  state.maskHeight = 0;
-  state.tier = "";
-  downloadButton.disabled = true;
+  resetResultUI();
 
   preview.src = state.originalUrl;
   preview.alt = file.name + " のプレビュー";
-  stageEmpty.hidden = true;
   workspace.hidden = false;
   dropZone.hidden = true;
+  document.body.classList.add("is-editing");
 
   try {
     await preview.decode();
     state.width = preview.naturalWidth;
     state.height = preview.naturalHeight;
-    fileName.textContent = file.name + (file.size ? " · " + formatBytes(file.size) : "");
+    fileName.textContent = shortName(file.name);
+    fileName.title = file.name;
     resolution.textContent = state.width + " × " + state.height;
-    engine.textContent = "未処理";
     runButton.disabled = false;
-    runLabel.textContent = "背景を透明化";
-    setView("original");
-    toast("画像を読み込んだよ。準備できたら「背景を透明化」を押してね");
+    toast("画像を読み込んだよ");
   } catch (_) {
-    toast("この画像形式はブラウザで読み込めなかった");
+    toast("この画像は読み込めなかった");
   }
 }
 
 function setView(view) {
+  if (view === "result" && !state.resultUrl) view = "original";
   state.view = view;
-  $$("[data-view]").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
-  if (view === "result" && state.resultUrl) {
-    preview.src = state.resultUrl;
-  } else if (state.originalUrl) {
-    preview.src = state.originalUrl;
-  }
+
+  $$("[data-view]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === view);
+  });
+
+  preview.src = view === "result" && state.resultUrl ? state.resultUrl : state.originalUrl;
 }
 
 function alphaWithEdge(value) {
@@ -268,6 +314,14 @@ function alphaWithEdge(value) {
   const contrast = amount >= 0 ? 1 + amount * 1.55 : 1 + amount * 0.25;
   x = (x - 0.5) * contrast + 0.5;
   return Math.round(Math.max(0, Math.min(1, x)) * 255);
+}
+
+async function loadImage(url) {
+  const image = new Image();
+  image.decoding = "async";
+  image.src = url;
+  await image.decode();
+  return image;
 }
 
 async function composeResult() {
@@ -279,15 +333,16 @@ async function composeResult() {
   canvas.height = state.height;
 
   const ctx = canvas.getContext("2d", { alpha: true });
-  if (!ctx) throw new Error("Canvasを作成できませんでした。");
+  if (!ctx) throw new Error("画像の合成を開始できませんでした。");
   ctx.drawImage(source, 0, 0, state.width, state.height);
 
   const maskCanvas = document.createElement("canvas");
   maskCanvas.width = state.maskWidth;
   maskCanvas.height = state.maskHeight;
   const maskCtx = maskCanvas.getContext("2d", { alpha: true });
-  const imageData = maskCtx.createImageData(state.maskWidth, state.maskHeight);
+  if (!maskCtx) throw new Error("マスクを作成できませんでした。");
 
+  const imageData = maskCtx.createImageData(state.maskWidth, state.maskHeight);
   for (let i = 0, p = 0; i < state.mask.length; i += 1, p += 4) {
     const a = alphaWithEdge(state.mask[i]);
     imageData.data[p] = 255;
@@ -295,8 +350,8 @@ async function composeResult() {
     imageData.data[p + 2] = 255;
     imageData.data[p + 3] = a;
   }
-
   maskCtx.putImageData(imageData, 0, 0);
+
   ctx.globalCompositeOperation = "destination-in";
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
@@ -304,22 +359,25 @@ async function composeResult() {
   ctx.globalCompositeOperation = "source-over";
 
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (!blob) throw new Error("PNGの生成に失敗しました。");
+  if (!blob) throw new Error("透過PNGを生成できませんでした。");
 
   if (state.resultUrl) URL.revokeObjectURL(state.resultUrl);
   state.resultUrl = URL.createObjectURL(blob);
-  downloadButton.disabled = false;
+
+  viewSwitch.hidden = false;
+  bgSwitch.hidden = false;
+  edgeField.hidden = false;
+  downloadButton.hidden = false;
+  controlActions.classList.add("has-result");
   setView("result");
 }
 
 async function processImage() {
   if (!state.file || state.busy) return;
 
-  let tier = resolveTier();
+  const tier = resolveTier();
   if (quality.value === "high" && tier !== "high") {
-    toast("この端末では標準AIへ自動切り替えるよ");
-  } else if (quality.value === "high" && state.mobile) {
-    toast("最高品質はモバイルで重いよ。処理中は他の重いタブを閉じると安定しやすい");
+    toast("この端末では標準品質へ切り替えるよ");
   }
 
   setBusy(true);
@@ -338,21 +396,22 @@ async function processImage() {
     state.tier = tier;
 
     statusTitle.textContent = "仕上げています";
-    statusDetail.textContent = "元解像度へ高品質合成中";
+    statusDetail.textContent = "透過PNGを作成中";
     progressBar.style.width = "100%";
 
     await composeResult();
 
     engine.textContent = tier === "high"
-      ? "BiRefNet · 1024 · WebGPU"
-      : "BiRefNet · 512 · " + (state.webgpu ? "WebGPU" : "WASM");
-    runLabel.textContent = "この設定で再処理";
-    toast("背景を透明化したよ");
+      ? "1024px · WebGPU"
+      : "512px · " + (state.webgpu ? "WebGPU" : "CPU");
+    runLabel.textContent = "AIで再処理";
+    toast("できた！");
   } catch (error) {
     console.error(error);
     setView("original");
-    engine.textContent = "処理エラー";
-    toast(error && error.message ? error.message : "処理に失敗しました");
+    engine.textContent = "エラー";
+    runLabel.textContent = "もう一度試す";
+    toast(error?.message || "処理に失敗しました");
   } finally {
     setBusy(false);
   }
@@ -376,28 +435,35 @@ function downloadResult() {
   a.remove();
 }
 
-pickButtons.forEach((button) => button.addEventListener("click", () => fileInput.click()));
-fileInput.addEventListener("change", () => selectFile(fileInput.files && fileInput.files[0]));
+pickButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    if (state.busy) return;
+    fileInput.value = "";
+    fileInput.click();
+  });
+});
 
+fileInput.addEventListener("change", () => selectFile(fileInput.files?.[0]));
 runButton.addEventListener("click", processImage);
 downloadButton.addEventListener("click", downloadResult);
-
 quality.addEventListener("change", updateQualityNote);
 
 edge.addEventListener("input", () => {
   edgeValue.textContent = edgeLabel(edge.value);
-});
-edge.addEventListener("change", async () => {
   if (!state.mask || state.busy) return;
-  processing.hidden = false;
-  statusTitle.textContent = "エッジを調整しています";
-  statusDetail.textContent = "AIのマスクからPNGを再合成中";
-  progressBar.style.width = "100%";
-  try {
-    await composeResult();
-  } finally {
-    processing.hidden = true;
-  }
+
+  clearTimeout(edgeTimer);
+  resultState.textContent = "輪郭を調整中";
+  edgeTimer = setTimeout(async () => {
+    try {
+      await composeResult();
+      resultState.textContent = "透過済み";
+    } catch (error) {
+      console.error(error);
+      resultState.textContent = "透過済み";
+      toast("輪郭調整に失敗しました");
+    }
+  }, 180);
 });
 
 $$("[data-view]").forEach((button) => {
@@ -406,8 +472,7 @@ $$("[data-view]").forEach((button) => {
 
 $$("[data-bg-choice]").forEach((button) => {
   button.addEventListener("click", () => {
-    const selected = button.dataset.bgChoice;
-    document.documentElement.dataset.bg = selected;
+    document.documentElement.dataset.bg = button.dataset.bgChoice;
     $$("[data-bg-choice]").forEach((item) => item.classList.toggle("active", item === button));
   });
 });
@@ -418,29 +483,28 @@ $$("[data-bg-choice]").forEach((button) => {
     dropZone.classList.add("dragging");
   });
 });
+
 ["dragleave", "drop"].forEach((type) => {
   dropZone.addEventListener(type, (event) => {
     event.preventDefault();
     dropZone.classList.remove("dragging");
   });
 });
+
 dropZone.addEventListener("drop", (event) => {
-  const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
-  selectFile(file);
+  selectFile(event.dataTransfer?.files?.[0]);
 });
 
 window.addEventListener("paste", (event) => {
-  const items = [...(event.clipboardData ? event.clipboardData.items : [])];
-  const imageItem = items.find((item) => item.type.startsWith("image/"));
+  const imageItem = [...(event.clipboardData?.items || [])].find((item) => item.type.startsWith("image/"));
   if (imageItem) selectFile(imageItem.getAsFile());
 });
 
 window.addEventListener("beforeunload", () => {
   if (state.originalUrl) URL.revokeObjectURL(state.originalUrl);
   if (state.resultUrl) URL.revokeObjectURL(state.resultUrl);
-  if (worker) {
-    try { worker.terminate(); } catch (_) {}
-  }
+  for (const [, task] of pending) clearTaskTimer(task);
+  try { worker?.terminate(); } catch (_) {}
 });
 
 edgeValue.textContent = edgeLabel(edge.value);
