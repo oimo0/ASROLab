@@ -36,14 +36,19 @@ const state = {
   tier: "",
   webgpu: false,
   highCapable: false,
+  mobile: false,
   busy: false,
   view: "result"
 };
 
-const worker = new Worker("./worker.js?v=1", { type: "module" });
+let worker = null;
 const pending = new Map();
 
-worker.addEventListener("message", (event) => {
+function ensureWorker() {
+  if (worker) return worker;
+  worker = new Worker("./worker.js?v=2", { type: "module" });
+
+  worker.addEventListener("message", (event) => {
   const data = event.data || {};
   const task = pending.get(data.requestId);
   if (!task) return;
@@ -77,16 +82,22 @@ worker.addEventListener("message", (event) => {
   }
 });
 
-worker.addEventListener("error", (event) => {
-  for (const [, task] of pending) task.reject(new Error(event.message || "AI worker error"));
-  pending.clear();
-});
+  worker.addEventListener("error", (event) => {
+    for (const [, task] of pending) task.reject(new Error(event.message || "AI worker error"));
+    pending.clear();
+    try { worker.terminate(); } catch (_) {}
+    worker = null;
+  });
+
+  return worker;
+}
 
 function workerProcess(payload) {
   return new Promise((resolve, reject) => {
+    const activeWorker = ensureWorker();
     const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
     pending.set(requestId, { resolve, reject });
-    worker.postMessage({ type: "process", requestId, ...payload });
+    activeWorker.postMessage({ type: "process", requestId, ...payload });
   });
 }
 
@@ -116,6 +127,12 @@ function formatBytes(bytes) {
 }
 
 async function detectDevice() {
+  state.mobile = Boolean(
+    navigator.userAgentData?.mobile ||
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    matchMedia("(pointer: coarse) and (max-width: 900px)").matches
+  );
+
   try {
     if (!("gpu" in navigator)) throw new Error("no webgpu");
     const adapter = await navigator.gpu.requestAdapter();
@@ -127,9 +144,12 @@ async function detectDevice() {
     state.highCapable = false;
   }
 
-  if (state.highCapable) {
+  if (state.highCapable && !state.mobile) {
     deviceTitle.textContent = "WebGPU 高品質対応";
-    deviceDetail.textContent = "1024px BiRefNetを端末GPUで実行できます";
+    deviceDetail.textContent = "Autoでは1024px BiRefNetを端末GPUで実行します";
+  } else if (state.webgpu && state.mobile) {
+    deviceTitle.textContent = "WebGPU モバイル";
+    deviceDetail.textContent = "安定性優先でAutoは512px fp16を使います";
   } else if (state.webgpu) {
     deviceTitle.textContent = "WebGPU 対応";
     deviceDetail.textContent = "互換性優先の512px AIを端末GPUで実行します";
@@ -144,20 +164,25 @@ function updateQualityNote() {
   const value = quality.value;
   if (value === "high") {
     qualityNote.textContent = state.highCapable
-      ? "1024pxモデルで細い髪・毛・製品の輪郭を優先します。"
+      ? (state.mobile
+          ? "1024pxモデル。モバイルではメモリ負荷が大きいため、必要なときだけ手動で使ってください。"
+          : "1024pxモデルで細い髪・毛・製品の輪郭を優先します。")
       : "この端末では最高品質モードを使えないため、実行時に標準へ切り替えます。";
   } else if (value === "standard") {
     qualityNote.textContent = "512pxモデル。軽くて幅広い端末で動作します。";
   } else {
-    qualityNote.textContent = state.highCapable
+    qualityNote.textContent = state.highCapable && !state.mobile
       ? "この端末では1024px高品質モデルを自動選択します。"
-      : "この端末では互換性の高い512pxモデルを自動選択します。";
+      : (state.mobile
+          ? "モバイルでは安定性を優先して512px fp16を自動選択します。"
+          : "この端末では互換性の高い512pxモデルを自動選択します。");
   }
 }
 
 function resolveTier() {
   if (quality.value === "standard") return "standard";
   if (quality.value === "high") return state.highCapable ? "high" : "standard";
+  if (state.mobile) return "standard";
   return state.highCapable ? "high" : "standard";
 }
 
@@ -221,7 +246,7 @@ async function selectFile(file) {
     runButton.disabled = false;
     runLabel.textContent = "背景を透明化";
     setView("original");
-    await processImage();
+    toast("画像を読み込んだよ。準備できたら「背景を透明化」を押してね");
   } catch (_) {
     toast("この画像形式はブラウザで読み込めなかった");
   }
@@ -292,7 +317,9 @@ async function processImage() {
 
   let tier = resolveTier();
   if (quality.value === "high" && tier !== "high") {
-    toast("この端末では標準AIへ自動切り替えするよ");
+    toast("この端末では標準AIへ自動切り替えるよ");
+  } else if (quality.value === "high" && state.mobile) {
+    toast("最高品質はモバイルで重いよ。処理中は他の重いタブを閉じると安定しやすい");
   }
 
   setBusy(true);
@@ -411,6 +438,9 @@ window.addEventListener("paste", (event) => {
 window.addEventListener("beforeunload", () => {
   if (state.originalUrl) URL.revokeObjectURL(state.originalUrl);
   if (state.resultUrl) URL.revokeObjectURL(state.resultUrl);
+  if (worker) {
+    try { worker.terminate(); } catch (_) {}
+  }
 });
 
 edgeValue.textContent = edgeLabel(edge.value);
