@@ -105,15 +105,30 @@ self.addEventListener("message", async (event) => {
 
     if (!logits) throw new Error("AIの出力マスクを取得できませんでした。");
 
-    const tensor = logits[0].sigmoid().mul(255).to("uint8");
-    const maskImage = RawImage.fromTensor(tensor);
-    const bytes = Uint8Array.from(maskImage.data);
+    // BiRefNet returns single-channel logits: [1, 1, H, W].
+    // Keep that alpha matte as a flat 1-channel buffer. Converting it
+    // through RawImage can reinterpret the channel layout and corrupt alpha.
+    const matte = logits.sigmoid().mul(255).to("uint8");
+    const dims = matte.dims || [];
+    const maskHeight = Number(dims[dims.length - 2]) || config.size;
+    const maskWidth = Number(dims[dims.length - 1]) || config.size;
+    const expected = maskWidth * maskHeight;
+    const raw = matte.data;
+    const bytes = new Uint8Array(expected);
+
+    if (!raw || raw.length < expected) {
+      throw new Error("AIマスクのサイズが不正です。");
+    }
+
+    // Batch/channel dimensions are both 1, so the first H*W values are
+    // exactly the foreground alpha matte.
+    for (let i = 0; i < expected; i += 1) bytes[i] = raw[i];
 
     send(requestId, {
       type: "result",
       tier: data.tier,
-      maskWidth: maskImage.width,
-      maskHeight: maskImage.height,
+      maskWidth,
+      maskHeight,
       mask: bytes.buffer
     }, [bytes.buffer]);
   } catch (error) {
