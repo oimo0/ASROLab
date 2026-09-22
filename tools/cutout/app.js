@@ -69,7 +69,7 @@ function armTaskTimer(requestId) {
 function ensureWorker() {
   if (worker) return worker;
 
-  worker = new Worker("./worker.js?v=3", { type: "module" });
+  worker = new Worker("./worker.js?v=4", { type: "module" });
 
   worker.addEventListener("message", (event) => {
     const data = event.data || {};
@@ -184,42 +184,21 @@ async function detectDevice() {
     state.highCapable = false;
   }
 
-  if (state.webgpu && state.mobile) {
-    deviceTitle.textContent = "WebGPU モバイル";
-    deviceDetail.textContent = "自動では安定性優先の512px AIを使います";
-  } else if (state.highCapable) {
-    deviceTitle.textContent = "WebGPU 高品質対応";
-    deviceDetail.textContent = "自動では1024px AIを使います";
-  } else if (state.webgpu) {
-    deviceTitle.textContent = "WebGPU 対応";
-    deviceDetail.textContent = "512px AIをGPUで実行します";
+  if (state.webgpu) {
+    deviceTitle.textContent = "RMBG-1.4 · WebGPU";
+    deviceDetail.textContent = "背景除去AIを端末GPUで実行します";
   } else {
-    deviceTitle.textContent = "CPU モード";
-    deviceDetail.textContent = "512px AIを端末内CPUで実行します";
+    deviceTitle.textContent = "RMBG-1.4 · CPU";
+    deviceDetail.textContent = "背景除去AIを端末内CPUで実行します";
   }
 
   updateQualityNote();
 }
 
 function updateQualityNote() {
-  if (quality.value === "high") {
-    qualityNote.textContent = state.highCapable
-      ? (state.mobile ? "高品質ですが、スマホでは重くなる場合があります。" : "細かい輪郭を優先する1024px AIです。")
-      : "この端末では使えないため、標準品質へ自動で切り替えます。";
-  } else if (quality.value === "standard") {
-    qualityNote.textContent = "軽くて安定しやすい512px AIです。";
-  } else {
-    qualityNote.textContent = state.mobile
-      ? "スマホでは安定性を優先して512px AIを選びます。"
-      : "端末の対応状況に合わせて自動で選びます。";
-  }
-}
-
-function resolveTier() {
-  if (quality.value === "standard") return "standard";
-  if (quality.value === "high") return state.highCapable ? "high" : "standard";
-  if (state.mobile) return "standard";
-  return state.highCapable ? "high" : "standard";
+  qualityNote.textContent = state.webgpu
+    ? "BRIA RMBG-1.4をWebGPUで実行します。"
+    : "BRIA RMBG-1.4をCPUで実行します。";
 }
 
 function resetResultUI() {
@@ -310,107 +289,17 @@ function setView(view) {
   preview.src = view === "result" && state.resultUrl ? state.resultUrl : state.originalUrl;
 }
 
-function analyzeMask(mask, width, height) {
-  const patch = Math.max(8, Math.floor(Math.min(width, height) * 0.08));
-  let cornerSum = 0;
-  let cornerCount = 0;
-  let centerSum = 0;
-  let centerCount = 0;
+function alphaWithEdge(value) {
+  let x = value / 255;
 
-  const samplePatch = (startX, startY) => {
-    for (let y = startY; y < Math.min(height, startY + patch); y += 2) {
-      for (let x = startX; x < Math.min(width, startX + patch); x += 2) {
-        cornerSum += mask[y * width + x];
-        cornerCount += 1;
-      }
-    }
-  };
-
-  samplePatch(0, 0);
-  samplePatch(Math.max(0, width - patch), 0);
-  samplePatch(0, Math.max(0, height - patch));
-  samplePatch(Math.max(0, width - patch), Math.max(0, height - patch));
-
-  const cx0 = Math.floor(width * 0.25);
-  const cx1 = Math.ceil(width * 0.75);
-  const cy0 = Math.floor(height * 0.25);
-  const cy1 = Math.ceil(height * 0.75);
-  const centerStep = Math.max(2, Math.floor(Math.min(width, height) / 128));
-  for (let y = cy0; y < cy1; y += centerStep) {
-    for (let x = cx0; x < cx1; x += centerStep) {
-      centerSum += mask[y * width + x];
-      centerCount += 1;
-    }
-  }
-
-  const cornerMean = cornerCount ? cornerSum / cornerCount : 0;
-  const centerMean = centerCount ? centerSum / centerCount : 0;
-
-  // Only invert when the border is clearly more foreground-like than the
-  // center. This avoids flipping bright/full-frame subjects by accident.
-  const invert = cornerMean > 145 && cornerMean > centerMean + 20;
-
-  // Build a histogram after polarity correction. BiRefNet sometimes
-  // predicts the right shape but with a compressed alpha range (for example
-  // foreground topping out around 80 instead of 255). Percentile stretching
-  // fixes that while keeping soft transition pixels for hair/edges.
-  const histogram = new Uint32Array(256);
-  let min = 255;
-  let max = 0;
-
-  for (let i = 0; i < mask.length; i += 1) {
-    const v = invert ? 255 - mask[i] : mask[i];
-    histogram[v] += 1;
-    if (v < min) min = v;
-    if (v > max) max = v;
-  }
-
-  const percentile = (p) => {
-    const target = Math.max(1, Math.floor(mask.length * p));
-    let count = 0;
-    for (let i = 0; i < 256; i += 1) {
-      count += histogram[i];
-      if (count >= target) return i;
-    }
-    return 255;
-  };
-
-  let low = percentile(0.01);
-  let high = percentile(0.995);
-
-  // Keep enough dynamic range for very small/simple subjects.
-  if (high - low < 24) {
-    low = min;
-    high = max;
-  }
-
-  return {
-    invert,
-    low,
-    high,
-    range: max - min
-  };
-}
-
-function alphaWithEdge(value, maskInfo) {
-  let v = maskInfo.invert ? 255 - value : value;
-  const span = Math.max(1, maskInfo.high - maskInfo.low);
-
-  // Normalize the model's useful alpha range so confident foreground becomes
-  // truly opaque instead of appearing washed out on the checkerboard.
-  let x = (v - maskInfo.low) / span;
-  x = Math.max(0, Math.min(1, x));
-
-  // Slight foreground boost. It leaves uncertain edge pixels soft, but makes
-  // the subject body solid even when the raw matte is conservative.
-  x = Math.pow(x, 0.72);
-
+  // RMBG-1.4 already returns a foreground matte. Keep the original alpha
+  // by default and only apply a small user-controlled edge contrast.
   const amount = (Number(edge.value) - 50) / 50;
-  const contrast = amount >= 0 ? 1 + amount * 1.35 : 1 + amount * 0.22;
+  const contrast = amount >= 0 ? 1 + amount * 1.2 : 1 + amount * 0.18;
   x = (x - 0.5) * contrast + 0.5;
 
-  if (x < 0.02) x = 0;
-  if (x > 0.94) x = 1;
+  if (x < 0.01) x = 0;
+  if (x > 0.99) x = 1;
 
   return Math.round(Math.max(0, Math.min(1, x)) * 255);
 }
@@ -442,14 +331,20 @@ async function composeResult() {
   if (!maskCtx) throw new Error("マスクを作成できませんでした。");
 
   const imageData = maskCtx.createImageData(state.maskWidth, state.maskHeight);
-  const maskInfo = analyzeMask(state.mask, state.maskWidth, state.maskHeight);
 
-  if (maskInfo.range < 12) {
-    throw new Error("被写体をうまく認識できませんでした。別の画像を試してね。");
+  let min = 255;
+  let max = 0;
+  for (let i = 0; i < state.mask.length; i += Math.max(1, Math.floor(state.mask.length / 4096))) {
+    const v = state.mask[i];
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  if (max - min < 8) {
+    throw new Error("被写体を認識できませんでした。別の画像を試してね。");
   }
 
   for (let i = 0, p = 0; i < state.mask.length; i += 1, p += 4) {
-    const a = alphaWithEdge(state.mask[i], maskInfo);
+    const a = alphaWithEdge(state.mask[i]);
     imageData.data[p] = 255;
     imageData.data[p + 1] = 255;
     imageData.data[p + 2] = 255;
@@ -481,25 +376,19 @@ async function composeResult() {
 async function processImage() {
   if (!state.file || state.busy) return;
 
-  const tier = resolveTier();
-  if (quality.value === "high" && tier !== "high") {
-    toast("この端末では標準品質へ切り替えるよ");
-  }
-
   setBusy(true);
   runLabel.textContent = "処理中…";
 
   try {
     const result = await workerProcess({
       file: state.file,
-      tier,
       webgpu: state.webgpu
     });
 
     state.mask = new Uint8Array(result.mask);
     state.maskWidth = result.maskWidth;
     state.maskHeight = result.maskHeight;
-    state.tier = tier;
+    state.tier = "rmbg";
 
     statusTitle.textContent = "仕上げています";
     statusDetail.textContent = "透過PNGを作成中";
@@ -507,9 +396,7 @@ async function processImage() {
 
     await composeResult();
 
-    engine.textContent = tier === "high"
-      ? "1024px · WebGPU"
-      : "512px · " + (state.webgpu ? "WebGPU" : "CPU");
+    engine.textContent = "RMBG-1.4 · " + (result.device === "webgpu" ? "WebGPU" : "CPU");
     runLabel.textContent = "AIで再処理";
     toast("できた！");
   } catch (error) {
