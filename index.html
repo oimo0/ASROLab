@@ -7,9 +7,9 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta name="description" content="ASROで作ったWebツールや小さな実験をまとめるASRO Lab。" />
   <title>ASRO Lab</title>
-  <link rel="icon" type="image/svg+xml" href="asro-lab-mark.svg?v=platform2" />
-  <link rel="stylesheet" href="assets/css/lab.css?v=platform2" />
-  <link rel="stylesheet" href="assets/css/refine.css?v=platform2" />
+  <link rel="icon" type="image/svg+xml" href="asro-lab-mark.svg?v=platform3" />
+  <link rel="stylesheet" href="assets/css/lab.css?v=platform3" />
+  <link rel="stylesheet" href="assets/css/refine.css?v=platform3" />
   <script>
     (() => {
       const saved = localStorage.getItem('asro-lab-theme') || 'auto';
@@ -18,7 +18,7 @@
       document.documentElement.dataset.resolvedTheme = saved === 'auto' ? (dark ? 'dark' : 'light') : saved;
     })();
   </script>
-  <script type="module" src="assets/js/app.js?v=platform2"></script>
+  <script type="module" src="assets/js/app.js?v=platform3"></script>
 </head>
 <body class="platform">
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -28,8 +28,9 @@
 
   <header class="site-header" data-header>
     <div class="shell nav-shell platform-nav">
-      <a class="brand brand-official" href="./" aria-label="ASRO Lab トップ">
-        <img class="brand-logo" src="asro-lab-logo.svg?v=platform2" alt="ASRO LAB" />
+      <a class="brand brand-official brand-lockup" href="./" aria-label="ASRO Lab トップ">
+        <img class="brand-mark-small" src="asro-lab-mark.svg?v=platform3" alt="" aria-hidden="true" />
+        <img class="brand-logo" src="asro-lab-logo.svg?v=platform3" alt="ASRO LAB" />
       </a>
       <nav class="nav-links platform-nav-links" aria-label="ページ内ナビゲーション">
         <a href="#home">Home</a>
@@ -68,11 +69,6 @@
           <div><strong data-category-count>00</strong><span>Categories</span></div>
           <div><strong data-new-count>00</strong><span>New</span></div>
         </div>
-      </div>
-
-      <div class="platform-hero-brand" aria-hidden="true">
-        <div class="brand-panel-glow"></div>
-        <img src="asro-lab-mark.svg?v=platform2" alt="" />
       </div>
     </section>
 
@@ -122,7 +118,7 @@
 
           <section class="platform-empty" data-empty hidden>
             <div class="platform-empty-icon" aria-hidden="true">
-              <img src="asro-lab-mark.svg?v=platform2" alt="" />
+              <img src="asro-lab-mark.svg?v=platform3" alt="" />
             </div>
             <div>
               <span class="empty-small">0 tools</span>
