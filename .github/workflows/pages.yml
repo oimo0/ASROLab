@@ -20,17 +20,6 @@ jobs:
           node-version: '20'
       - run: npm run build
       - run: npm run check
-      - name: Bundle RMBG-1.4 model for GitHub Pages
-        shell: bash
-        run: |
-          set -euo pipefail
-          MODEL_DIR="models/briaai/RMBG-1.4"
-          mkdir -p "$MODEL_DIR/onnx"
-          curl --fail --location --retry 3             "https://huggingface.co/briaai/RMBG-1.4/resolve/main/config.json"             -o "$MODEL_DIR/config.json"
-          curl --fail --location --retry 3             "https://huggingface.co/briaai/RMBG-1.4/resolve/main/preprocessor_config.json"             -o "$MODEL_DIR/preprocessor_config.json"
-          curl --fail --location --retry 3             "https://huggingface.co/briaai/RMBG-1.4/resolve/main/onnx/model_quantized.onnx"             -o "$MODEL_DIR/onnx/model_quantized.onnx"
-          echo "Bundled model:"
-          du -h "$MODEL_DIR/onnx/model_quantized.onnx"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
