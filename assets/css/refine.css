@@ -104,3 +104,20 @@
   .platform-footer .shell{align-items:flex-start}
   .platform-footer div div{gap:10px;flex-wrap:wrap}
 }
+/* Platform v2 cache-safe cleanup */
+.side-brand{display:none!important}
+.platform-nav .brand-official{
+  padding:4px 6px;
+  min-width:0;
+}
+.platform-nav .brand-logo{
+  width:118px;
+  height:auto;
+  max-width:none;
+}
+@media(max-width:760px){
+  .platform-nav .brand-logo{width:124px}
+}
+@media(max-width:560px){
+  .platform-nav .brand-logo{width:128px}
+}
