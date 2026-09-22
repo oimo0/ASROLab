@@ -69,7 +69,7 @@ function armTaskTimer(requestId) {
 function ensureWorker() {
   if (worker) return worker;
 
-  worker = new Worker("./worker.js?v=2", { type: "module" });
+  worker = new Worker("./worker.js?v=3", { type: "module" });
 
   worker.addEventListener("message", (event) => {
     const data = event.data || {};
@@ -310,11 +310,55 @@ function setView(view) {
   preview.src = view === "result" && state.resultUrl ? state.resultUrl : state.originalUrl;
 }
 
-function alphaWithEdge(value) {
-  let x = value / 255;
+function analyzeMask(mask, width, height) {
+  // Background is usually visible in the image corners. If the corner
+  // alpha is mostly opaque, the model output polarity is probably reversed.
+  const patch = Math.max(6, Math.floor(Math.min(width, height) * 0.08));
+  let cornerSum = 0;
+  let cornerCount = 0;
+
+  const samplePatch = (startX, startY) => {
+    for (let y = startY; y < Math.min(height, startY + patch); y += 2) {
+      for (let x = startX; x < Math.min(width, startX + patch); x += 2) {
+        cornerSum += mask[y * width + x];
+        cornerCount += 1;
+      }
+    }
+  };
+
+  samplePatch(0, 0);
+  samplePatch(Math.max(0, width - patch), 0);
+  samplePatch(0, Math.max(0, height - patch));
+  samplePatch(Math.max(0, width - patch), Math.max(0, height - patch));
+
+  const cornerMean = cornerCount ? cornerSum / cornerCount : 0;
+
+  let min = 255;
+  let max = 0;
+  const step = Math.max(1, Math.floor(mask.length / 4096));
+  for (let i = 0; i < mask.length; i += step) {
+    const v = mask[i];
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+
+  return {
+    invert: cornerMean > 150,
+    range: max - min
+  };
+}
+
+function alphaWithEdge(value, invert = false) {
+  let x = (invert ? 255 - value : value) / 255;
   const amount = (Number(edge.value) - 50) / 50;
   const contrast = amount >= 0 ? 1 + amount * 1.55 : 1 + amount * 0.25;
   x = (x - 0.5) * contrast + 0.5;
+
+  // Snap nearly transparent/opaque pixels to clean values while keeping
+  // the middle alpha range for hair and soft edges.
+  if (x < 0.015) x = 0;
+  if (x > 0.985) x = 1;
+
   return Math.round(Math.max(0, Math.min(1, x)) * 255);
 }
 
@@ -345,8 +389,14 @@ async function composeResult() {
   if (!maskCtx) throw new Error("マスクを作成できませんでした。");
 
   const imageData = maskCtx.createImageData(state.maskWidth, state.maskHeight);
+  const maskInfo = analyzeMask(state.mask, state.maskWidth, state.maskHeight);
+
+  if (maskInfo.range < 12) {
+    throw new Error("被写体をうまく認識できませんでした。別の画像を試してね。");
+  }
+
   for (let i = 0, p = 0; i < state.mask.length; i += 1, p += 4) {
-    const a = alphaWithEdge(state.mask[i]);
+    const a = alphaWithEdge(state.mask[i], maskInfo.invert);
     imageData.data[p] = 255;
     imageData.data[p + 1] = 255;
     imageData.data[p + 2] = 255;
