@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#f5f6f8" />
   <meta name="description" content="画像を外部へ送信せず、端末内AIで高品質に背景を透明化するASRO Labツール。" />
   <title>ASRO Cutout | ASRO Lab</title>
-  <link rel="stylesheet" href="./style.css?v=4" />
+  <link rel="stylesheet" href="./style.css?v=5" />
   <script type="module" src="../../shared/lab-header.js"></script>
-  <script type="module" src="./app.js?v=4"></script>
+  <script type="module" src="./app.js?v=5"></script>
 </head>
 <body>
   <lab-header tool-name="ASRO Cutout"></lab-header>
@@ -42,7 +42,7 @@
             <button class="change-button" type="button" data-change-image>画像を変更</button>
           </div>
 
-          <div class="preview-toolbar">
+          <div class="preview-toolbar" data-preview-toolbar hidden>
             <div class="segmented" data-view-switch hidden role="group" aria-label="プレビュー切り替え">
               <button class="active" type="button" data-view="result">透過結果</button>
               <button type="button" data-view="original">元画像</button>
