@@ -1,0 +1,9 @@
+{
+  "name": "ASRO Cutout",
+  "description": "端末内AIで画像を高品質に背景透明化。画像を外部へ送らず、元解像度の透過PNGで保存。",
+  "status": "beta",
+  "category": "Image",
+  "tags": ["背景透過", "AI", "画像", "WebGPU", "プライバシー"],
+  "added": "2026-09-22",
+  "featured": true
+}
