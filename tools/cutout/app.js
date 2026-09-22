@@ -24,6 +24,7 @@ const deviceTitle = $("[data-device-title]");
 const deviceDetail = $("[data-device-detail]");
 const resultState = $("[data-result-state]");
 const viewSwitch = $("[data-view-switch]");
+const previewToolbar = $("[data-preview-toolbar]");
 const bgSwitch = $("[data-bg-switch]");
 const controlActions = $(".control-actions");
 const pickButtons = $$("[data-pick], [data-change-image]");
@@ -230,6 +231,7 @@ function resetResultUI() {
   if (state.resultUrl) URL.revokeObjectURL(state.resultUrl);
   state.resultUrl = "";
 
+  previewToolbar.hidden = true;
   viewSwitch.hidden = true;
   bgSwitch.hidden = true;
   edgeField.hidden = true;
@@ -364,6 +366,7 @@ async function composeResult() {
   if (state.resultUrl) URL.revokeObjectURL(state.resultUrl);
   state.resultUrl = URL.createObjectURL(blob);
 
+  previewToolbar.hidden = false;
   viewSwitch.hidden = false;
   bgSwitch.hidden = false;
   edgeField.hidden = false;
