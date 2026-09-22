@@ -1,5 +1,25 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-21T13:15:24.350Z",
-  "tools": []
+  "generatedAt": "2026-09-22T09:59:00.000Z",
+  "tools": [
+    {
+      "name": "ASRO Cutout",
+      "description": "BRIA RMBG-1.4を端末内で実行して画像を高品質に背景透明化。画像を外部へ送らず透過PNGで保存。",
+      "status": "beta",
+      "category": "Image",
+      "tags": [
+        "背景透過",
+        "RMBG-1.4",
+        "AI",
+        "画像",
+        "WebGPU",
+        "プライバシー"
+      ],
+      "added": "2026-09-22",
+      "featured": true,
+      "id": "cutout",
+      "url": "tools/cutout/",
+      "thumbnailUrl": null
+    }
+  ]
 }
