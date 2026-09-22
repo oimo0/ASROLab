@@ -8,7 +8,7 @@
   <title>ASRO Cutout | ASRO Lab</title>
   <link rel="stylesheet" href="./style.css?v=1" />
   <script type="module" src="../../shared/lab-header.js"></script>
-  <script type="module" src="./app.js?v=1"></script>
+  <script type="module" src="./app.js?v=2"></script>
 </head>
 <body>
   <lab-header tool-name="ASRO Cutout"></lab-header>
@@ -89,7 +89,7 @@
               <option value="high">最高品質 — 1024px AI</option>
               <option value="standard">標準 — 512px AI</option>
             </select>
-            <small data-quality-note>WebGPU対応端末では1024pxモデルを優先します。</small>
+            <small data-quality-note>スマホは512px fp16を優先し、PCでは対応状況に応じて1024pxモデルを使います。</small>
           </label>
 
           <label class="field">
