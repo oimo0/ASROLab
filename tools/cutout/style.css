@@ -74,6 +74,8 @@ html[data-bg="dark"] .image-stage{background:#17191f}
 .run-button{background:linear-gradient(135deg,var(--accent),#6d63ff);color:white;box-shadow:0 10px 24px rgba(91,124,255,.20)}
 .run-button[disabled]{opacity:.5;cursor:not-allowed;transform:none}
 .download-button{background:var(--text);color:var(--bg)}
+.control-actions.has-result .download-button{order:-1}
+.control-actions.has-result .run-button{background:var(--surface-2);color:var(--text);box-shadow:none;border:1px solid var(--line)}
 .run-button svg,.download-button svg{width:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
 .field{display:block}
