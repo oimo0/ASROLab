@@ -311,11 +311,11 @@ function setView(view) {
 }
 
 function analyzeMask(mask, width, height) {
-  // Background is usually visible in the image corners. If the corner
-  // alpha is mostly opaque, the model output polarity is probably reversed.
-  const patch = Math.max(6, Math.floor(Math.min(width, height) * 0.08));
+  const patch = Math.max(8, Math.floor(Math.min(width, height) * 0.08));
   let cornerSum = 0;
   let cornerCount = 0;
+  let centerSum = 0;
+  let centerCount = 0;
 
   const samplePatch = (startX, startY) => {
     for (let y = startY; y < Math.min(height, startY + patch); y += 2) {
@@ -331,33 +331,86 @@ function analyzeMask(mask, width, height) {
   samplePatch(0, Math.max(0, height - patch));
   samplePatch(Math.max(0, width - patch), Math.max(0, height - patch));
 
-  const cornerMean = cornerCount ? cornerSum / cornerCount : 0;
+  const cx0 = Math.floor(width * 0.25);
+  const cx1 = Math.ceil(width * 0.75);
+  const cy0 = Math.floor(height * 0.25);
+  const cy1 = Math.ceil(height * 0.75);
+  const centerStep = Math.max(2, Math.floor(Math.min(width, height) / 128));
+  for (let y = cy0; y < cy1; y += centerStep) {
+    for (let x = cx0; x < cx1; x += centerStep) {
+      centerSum += mask[y * width + x];
+      centerCount += 1;
+    }
+  }
 
+  const cornerMean = cornerCount ? cornerSum / cornerCount : 0;
+  const centerMean = centerCount ? centerSum / centerCount : 0;
+
+  // Only invert when the border is clearly more foreground-like than the
+  // center. This avoids flipping bright/full-frame subjects by accident.
+  const invert = cornerMean > 145 && cornerMean > centerMean + 20;
+
+  // Build a histogram after polarity correction. BiRefNet sometimes
+  // predicts the right shape but with a compressed alpha range (for example
+  // foreground topping out around 80 instead of 255). Percentile stretching
+  // fixes that while keeping soft transition pixels for hair/edges.
+  const histogram = new Uint32Array(256);
   let min = 255;
   let max = 0;
-  const step = Math.max(1, Math.floor(mask.length / 4096));
-  for (let i = 0; i < mask.length; i += step) {
-    const v = mask[i];
+
+  for (let i = 0; i < mask.length; i += 1) {
+    const v = invert ? 255 - mask[i] : mask[i];
+    histogram[v] += 1;
     if (v < min) min = v;
     if (v > max) max = v;
   }
 
+  const percentile = (p) => {
+    const target = Math.max(1, Math.floor(mask.length * p));
+    let count = 0;
+    for (let i = 0; i < 256; i += 1) {
+      count += histogram[i];
+      if (count >= target) return i;
+    }
+    return 255;
+  };
+
+  let low = percentile(0.01);
+  let high = percentile(0.995);
+
+  // Keep enough dynamic range for very small/simple subjects.
+  if (high - low < 24) {
+    low = min;
+    high = max;
+  }
+
   return {
-    invert: cornerMean > 150,
+    invert,
+    low,
+    high,
     range: max - min
   };
 }
 
-function alphaWithEdge(value, invert = false) {
-  let x = (invert ? 255 - value : value) / 255;
+function alphaWithEdge(value, maskInfo) {
+  let v = maskInfo.invert ? 255 - value : value;
+  const span = Math.max(1, maskInfo.high - maskInfo.low);
+
+  // Normalize the model's useful alpha range so confident foreground becomes
+  // truly opaque instead of appearing washed out on the checkerboard.
+  let x = (v - maskInfo.low) / span;
+  x = Math.max(0, Math.min(1, x));
+
+  // Slight foreground boost. It leaves uncertain edge pixels soft, but makes
+  // the subject body solid even when the raw matte is conservative.
+  x = Math.pow(x, 0.72);
+
   const amount = (Number(edge.value) - 50) / 50;
-  const contrast = amount >= 0 ? 1 + amount * 1.55 : 1 + amount * 0.25;
+  const contrast = amount >= 0 ? 1 + amount * 1.35 : 1 + amount * 0.22;
   x = (x - 0.5) * contrast + 0.5;
 
-  // Snap nearly transparent/opaque pixels to clean values while keeping
-  // the middle alpha range for hair and soft edges.
-  if (x < 0.015) x = 0;
-  if (x > 0.985) x = 1;
+  if (x < 0.02) x = 0;
+  if (x > 0.94) x = 1;
 
   return Math.round(Math.max(0, Math.min(1, x)) * 255);
 }
@@ -396,7 +449,7 @@ async function composeResult() {
   }
 
   for (let i = 0, p = 0; i < state.mask.length; i += 1, p += 4) {
-    const a = alphaWithEdge(state.mask[i], maskInfo.invert);
+    const a = alphaWithEdge(state.mask[i], maskInfo);
     imageData.data[p] = 255;
     imageData.data[p + 1] = 255;
     imageData.data[p + 2] = 255;
