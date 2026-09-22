@@ -69,7 +69,7 @@ function armTaskTimer(requestId) {
 function ensureWorker() {
   if (worker) return worker;
 
-  worker = new Worker("./worker.js?v=4", { type: "module" });
+  worker = new Worker("./worker.js?v=5", { type: "module" });
 
   worker.addEventListener("message", (event) => {
     const data = event.data || {};
