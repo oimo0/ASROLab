@@ -12,7 +12,7 @@ class LabHeader extends HTMLElement {
       <div class="bar">
         <a class="back" href="../../" aria-label="ASRO Labへ戻る"><span aria-hidden="true">←</span><span class="lab">ASRO LAB</span></a>
         <span class="name">${name.replace(/[<>&"']/g, '')}</span>
-        <a href="../../#catalog" aria-label="Lab shelfへ戻る"><span class="dot" aria-hidden="true"></span><span class="lab">INDEX</span></a>
+        <a href="../../#tools" aria-label="Lab shelfへ戻る"><span class="dot" aria-hidden="true"></span><span class="lab">INDEX</span></a>
       </div>`;
   }
 }
