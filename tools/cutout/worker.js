@@ -1,24 +1,15 @@
-import { AutoModel, AutoProcessor, RawImage, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
+import { pipeline, RawImage, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
 
 env.allowLocalModels = false;
+env.useBrowserCache = true;
 
-const MODELS = {
-  high: {
-    id: "jiabins0303/birefnet-lite-1024-webgpu",
-    size: 1024
-  },
-  standard: {
-    id: "studioludens/birefnet-lite-512",
-    size: 512
-  }
-};
+const MODEL_ID = "briaai/RMBG-1.4";
 
-let model = null;
-let processor = null;
-let activeKey = "";
+let segmenter = null;
+let activeDevice = "";
 
-function send(requestId, payload, transfer) {
-  self.postMessage({ requestId, ...payload }, transfer || []);
+function send(requestId, payload, transfer = []) {
+  self.postMessage({ requestId, ...payload }, transfer);
 }
 
 function progressReporter(requestId) {
@@ -34,53 +25,106 @@ function progressReporter(requestId) {
   };
 }
 
-async function disposeCurrent() {
-  if (model && typeof model.dispose === "function") {
-    try { await model.dispose(); } catch (_) {}
+async function disposePipeline() {
+  if (segmenter && typeof segmenter.dispose === "function") {
+    try { await segmenter.dispose(); } catch (_) {}
   }
-  model = null;
-  processor = null;
-  activeKey = "";
+  segmenter = null;
+  activeDevice = "";
 }
 
-async function ensureModel(requestId, tier, webgpu) {
-  const config = MODELS[tier];
-  if (!config) throw new Error("Unknown quality tier.");
-  if (tier === "high" && !webgpu) {
-    const error = new Error("最高品質モードにはWebGPUが必要です。");
-    error.code = "WEBGPU_REQUIRED";
-    throw error;
-  }
+async function loadPipeline(requestId, preferredDevice) {
+  if (segmenter && activeDevice === preferredDevice) return segmenter;
 
-  const key = tier + ":" + (webgpu ? "webgpu" : "wasm");
-  if (model && processor && activeKey === key) return config;
+  await disposePipeline();
 
-  await disposeCurrent();
   send(requestId, {
     type: "status",
     phase: "loading",
-    title: tier === "high" ? "高品質AIを準備しています" : "AIを準備しています",
-    detail: "初回はモデルを端末へ読み込みます"
+    title: "RMBG-1.4を準備しています",
+    detail: "初回のみAIモデルを端末へ読み込みます"
   });
 
   const progress_callback = progressReporter(requestId);
-  const options = tier === "high"
-    ? {
-        device: "webgpu",
-        dtype: "fp32",
-        model_file_name: "model_fp16",
-        progress_callback
-      }
-    : {
-        device: webgpu ? "webgpu" : "wasm",
-        dtype: webgpu ? "fp16" : "fp32",
-        progress_callback
-      };
 
-  model = await AutoModel.from_pretrained(config.id, options);
-  processor = await AutoProcessor.from_pretrained(config.id, { progress_callback });
-  activeKey = key;
-  return config;
+  try {
+    segmenter = await pipeline("image-segmentation", MODEL_ID, {
+      device: preferredDevice,
+      dtype: "fp32",
+      progress_callback
+    });
+    activeDevice = preferredDevice;
+    return segmenter;
+  } catch (error) {
+    if (preferredDevice !== "webgpu") throw error;
+
+    send(requestId, {
+      type: "status",
+      phase: "fallback",
+      title: "CPUモードへ切り替えています",
+      detail: "WebGPUで起動できなかったためWASMで再試行します"
+    });
+
+    await disposePipeline();
+    segmenter = await pipeline("image-segmentation", MODEL_ID, {
+      device: "wasm",
+      dtype: "fp32",
+      progress_callback
+    });
+    activeDevice = "wasm";
+    return segmenter;
+  }
+}
+
+function extractMask(mask) {
+  if (!mask || !mask.data || !mask.width || !mask.height) {
+    throw new Error("RMBG-1.4のマスクを取得できませんでした。");
+  }
+
+  const width = Number(mask.width);
+  const height = Number(mask.height);
+  const pixels = width * height;
+  const src = mask.data;
+
+  if (!pixels || src.length < pixels) {
+    throw new Error("RMBG-1.4のマスクサイズが不正です。");
+  }
+
+  if (src.length === pixels) {
+    return { width, height, bytes: Uint8Array.from(src) };
+  }
+
+  const channels = Math.max(1, Math.floor(src.length / pixels));
+  const usableChannels = Math.min(channels, 4);
+
+  // RawImage masks can be grayscale, RGB, or RGBA depending on pipeline
+  // internals. Pick the channel that actually contains the segmentation
+  // signal instead of assuming alpha is always the useful channel.
+  let bestChannel = 0;
+  let bestRange = -1;
+
+  for (let c = 0; c < usableChannels; c += 1) {
+    let min = 255;
+    let max = 0;
+    const step = Math.max(1, Math.floor(pixels / 4096));
+    for (let i = 0; i < pixels; i += step) {
+      const v = Number(src[i * channels + c] ?? 0);
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    const range = max - min;
+    if (range > bestRange) {
+      bestRange = range;
+      bestChannel = c;
+    }
+  }
+
+  const bytes = new Uint8Array(pixels);
+  for (let i = 0; i < pixels; i += 1) {
+    bytes[i] = Number(src[i * channels + bestChannel] ?? 0);
+  }
+
+  return { width, height, bytes };
 }
 
 self.addEventListener("message", async (event) => {
@@ -88,54 +132,38 @@ self.addEventListener("message", async (event) => {
   if (data.type !== "process") return;
 
   const requestId = data.requestId;
+
   try {
-    const config = await ensureModel(requestId, data.tier, Boolean(data.webgpu));
+    const preferredDevice = data.webgpu ? "webgpu" : "wasm";
+    const pipe = await loadPipeline(requestId, preferredDevice);
 
     send(requestId, {
       type: "status",
       phase: "running",
-      title: "背景を解析しています",
-      detail: config.size + "px AIで輪郭を抽出中"
+      title: "背景を判定しています",
+      detail: "BRIA RMBG-1.4で前景を抽出中"
     });
 
     const image = await RawImage.read(data.file);
-    const inputs = await processor(image);
-    const outputs = await model({ input_image: inputs.pixel_values });
-    const logits = outputs.logits || outputs.output_image || outputs[Object.keys(outputs)[0]];
+    const output = await pipe(image);
+    const first = Array.isArray(output) ? output[0] : output;
+    const mask = first?.mask || first;
 
-    if (!logits) throw new Error("AIの出力マスクを取得できませんでした。");
-
-    // BiRefNet returns single-channel logits: [1, 1, H, W].
-    // Keep that alpha matte as a flat 1-channel buffer. Converting it
-    // through RawImage can reinterpret the channel layout and corrupt alpha.
-    const matte = logits.sigmoid().mul(255).to("uint8");
-    const dims = matte.dims || [];
-    const maskHeight = Number(dims[dims.length - 2]) || config.size;
-    const maskWidth = Number(dims[dims.length - 1]) || config.size;
-    const expected = maskWidth * maskHeight;
-    const raw = matte.data;
-    const bytes = new Uint8Array(expected);
-
-    if (!raw || raw.length < expected) {
-      throw new Error("AIマスクのサイズが不正です。");
-    }
-
-    // Batch/channel dimensions are both 1, so the first H*W values are
-    // exactly the foreground alpha matte.
-    for (let i = 0; i < expected; i += 1) bytes[i] = raw[i];
+    const { width, height, bytes } = extractMask(mask);
 
     send(requestId, {
       type: "result",
-      tier: data.tier,
-      maskWidth,
-      maskHeight,
+      model: "BRIA RMBG-1.4",
+      device: activeDevice,
+      maskWidth: width,
+      maskHeight: height,
       mask: bytes.buffer
     }, [bytes.buffer]);
   } catch (error) {
     send(requestId, {
       type: "error",
-      code: error && error.code ? error.code : "",
-      message: error && error.message ? error.message : String(error)
+      code: error?.code || "",
+      message: error?.message || String(error)
     });
   }
 });
