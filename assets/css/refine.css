@@ -108,3 +108,74 @@
   .empty-copy{padding:24px 20px 28px}
   .empty-copy h3{font-size:1.65rem}
 }
+
+/* Official ASRO Lab branding */
+.brand-official{
+  padding:6px 10px;
+  border-radius:14px;
+  background:rgba(255,255,255,.94);
+  border:1px solid rgba(0,0,0,.08);
+  box-shadow:0 8px 26px rgba(0,0,0,.08);
+}
+.brand-logo{
+  display:block;
+  width:auto;
+  height:27px;
+}
+.mark-card{
+  min-height:360px;
+  border:1px solid var(--line);
+  border-radius:30px;
+  background:linear-gradient(145deg,rgba(255,255,255,.96),rgba(255,255,255,.80));
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(24px) saturate(130%);
+  position:relative;
+  overflow:hidden;
+  display:grid;
+  place-items:center;
+}
+.mark-glow{
+  position:absolute;
+  width:260px;
+  height:260px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(73,191,255,.20),rgba(73,191,255,.07) 38%,transparent 72%);
+  filter:blur(8px);
+  animation:breathe 6s ease-in-out infinite;
+}
+.hero-mark{
+  position:relative;
+  z-index:1;
+  width:min(58%,210px);
+  height:auto;
+  filter:drop-shadow(0 20px 34px rgba(0,0,0,.10));
+}
+.mark-caption{
+  position:absolute;
+  left:22px;
+  right:22px;
+  bottom:18px;
+  z-index:2;
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  color:#0e1118;
+  font-size:.68rem;
+}
+.mark-caption span{font-weight:800}
+.mark-caption small{font-size:.66rem;color:#6e7789}
+html[data-resolved-theme="dark"] .brand-official{
+  background:#fff;
+  border-color:rgba(255,255,255,.08);
+}
+html[data-resolved-theme="dark"] .mark-card{
+  background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(255,255,255,.88));
+  border-color:rgba(255,255,255,.14);
+}
+@media(max-width:640px){
+  .brand-official{padding:5px 8px;border-radius:12px}
+  .brand-logo{height:23px}
+  .mark-card{min-height:250px;border-radius:26px}
+  .hero-mark{width:min(54%,160px)}
+  .mark-caption{left:18px;right:18px;bottom:15px}
+}
