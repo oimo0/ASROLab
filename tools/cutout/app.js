@@ -426,6 +426,7 @@ function downloadResult() {
   document.body.appendChild(a);
   a.click();
   a.remove();
+  toast("透過PNGの保存を開始しました ✓");
 }
 
 pickButtons.forEach((button) => {
